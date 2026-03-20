@@ -5,23 +5,36 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 from groq import Groq
 from dotenv import load_dotenv
 
-# Load environment variables
+# 1. Load Environment Variables
 load_dotenv()
 
-# Setup logging
+# 2. Setup Logging (Detailed so we can see errors)
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
+logger = logging.getLogger(__name__)
 
-# Get Keys from Environment Variables (Render will provide these)
+# 3. Get Keys from Render Environment Variables
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
-# Initialize Groq Client
-client = Groq(api_key=GROQ_API_KEY)
+# 4. Safety Check: Ensure keys exist before starting
+if not TELEGRAM_TOKEN:
+    logger.error("❌ CRITICAL ERROR: TELEGRAM_TOKEN not found in Environment Variables!")
+    # We don't exit immediately so Render doesn't think the build failed, but it won't work.
+if not GROQ_API_KEY:
+    logger.error("❌ CRITICAL ERROR: GROQ_API_KEY not found in Environment Variables!")
 
-# Define the Bot's Personality
+# 5. Initialize Groq Client
+try:
+    client = Groq(api_key=GROQ_API_KEY)
+    logger.info("✅ Groq Client initialized successfully.")
+except Exception as e:
+    logger.error(f"❌ Failed to initialize Groq: {e}")
+    client = None
+
+# 6. Define the Bot's Personality
 SYSTEM_PROMPT = """
 You are a professional AI assistant owned by Peculiar.
 Peculiar is an expert Video Editor, Graphics Designer, and Web Developer with over 2 years of experience.
@@ -34,35 +47,53 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "Hello! I am Peculiar's Professional Assistant.\n"
         "I specialize in Video Editing, Graphics Design, and Web Development.\n"
-        "How can I assist you today?"
-    )
+        "How can I assist you today?"    )
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if client is None:
+        await update.message.reply_text("⚠️ System Configuration Error: AI Brain not connected. Please contact the admin.")
+        return
+
     user_text = update.message.text
-    logging.info(f"User said: {user_text}")
+    logger.info(f"👤 User said: {user_text}")
 
     try:
-        # Send message to Groq AI with the UPDATED model name
+        # Send message to Groq AI
         chat_completion = client.chat.completions.create(
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": user_text}
             ],
-            model="llama-3.1-70b-versatile", # ✅ FIXED: Updated to the new active model
+            # ✅ UPDATED MODEL NAME (This was the cause of previous errors)
+            model="llama-3.1-70b-versatile", 
+            temperature=0.7,
+            max_tokens=1024,
         )
 
         ai_response = chat_completion.choices[0].message.content
+        logger.info(f"🤖 Bot replied: {ai_response[:50]}...") # Log first 50 chars
         await update.message.reply_text(ai_response)
 
     except Exception as e:
-        logging.error(f"Error: {e}")
-        await update.message.reply_text("I encountered a technical issue. Please try again.")
+        logger.error(f"❌ Error processing message: {e}")
+        # Send a more specific error message if it's an API key issue
+        if "authentication" in str(e).lower():
+            await update.message.reply_text("⚠️ Authentication Error: The AI service key is invalid.")
+        else:
+            await update.message.reply_text("I encountered a technical issue. Please try again in a moment.")
 
 if __name__ == '__main__':
-    print("Bot is starting...")
-    app = Application.builder().token(TELEGRAM_TOKEN).build()
+    logger.info("🚀 Bot is starting up...")
     
-    app.add_handler(CommandHandler("start", start_command))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    
-    app.run_polling(allowed_updates=Update.ALL_TYPES)
+    if not TELEGRAM_TOKEN:
+        logger.error("🛑 Cannot start bot: Telegram Token is missing!")
+        # Keep the process alive slightly so Render doesn't crash immediately, but it won't connect
+        import time
+        time.sleep(10) 
+    else:
+        app = Application.builder().token(TELEGRAM_TOKEN).build()
+        
+        app.add_handler(CommandHandler("start", start_command))
+        app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+        
+        logger.info("✅ Bot is running and listening for messages...")        app.run_polling(allowed_updates=Update.ALL_TYPES)
