@@ -21,9 +21,9 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 # 4. Safety Check
 if not TELEGRAM_TOKEN:
-    logger.error("CRITICAL ERROR: TELEGRAM_TOKEN not found in Environment Variables!")
+    logger.error("CRITICAL ERROR: TELEGRAM_TOKEN not found!")
 if not GROQ_API_KEY:
-    logger.error("CRITICAL ERROR: GROQ_API_KEY not found in Environment Variables!")
+    logger.error("CRITICAL ERROR: GROQ_API_KEY not found!")
 
 # 5. Initialize Groq Client
 try:
@@ -48,22 +48,25 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "I specialize in Video Editing, Graphics Design, and Web Development.\n"
         "How can I assist you today?"
     )
-
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if client is None:
-        await update.message.reply_text("System Configuration Error: AI Brain not connected. Please contact the admin.")
+        await update.message.reply_text("System Configuration Error: AI Brain not connected.")
         return
 
     user_text = update.message.text
     logger.info(f"User said: {user_text}")
 
     try:
+        # --- THIS IS THE FIXED LINE ---
+        # Notice the ".1" after "llama-3". This is the current working model.
+        model_name = "llama-3.1-70b-versatile" 
+        
         chat_completion = client.chat.completions.create(
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": user_text}
             ],
-            model="llama-3.1-70b-versatile", 
+            model=model_name, 
             temperature=0.7,
             max_tokens=1024,
         )
@@ -73,11 +76,17 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(ai_response)
 
     except Exception as e:
-        logger.error(f"Error processing message: {e}")
-        if "authentication" in str(e).lower():
-            await update.message.reply_text("Authentication Error: The AI service key is invalid.")
+        error_msg = str(e)
+        logger.error(f"Error processing message: {error_msg}")
+        
+        # Specific check for the model error to help us debug if it happens again
+        if "decommissioned" in error_msg or "invalid_request_error" in error_msg:
+            logger.error(f"MODEL ERROR: The model name '{model_name}' might be wrong.")
+            await update.message.reply_text("System Error: Invalid AI Model configuration. Admin notified.")
+        elif "authentication" in error_msg.lower():
+            await update.message.reply_text("Authentication Error: Invalid API Key.")
         else:
-            await update.message.reply_text("I encountered a technical issue. Please try again in a moment.")
+            await update.message.reply_text("I encountered a technical issue. Please try again.")
 
 if __name__ == '__main__':
     logger.info("Bot is starting up...")
@@ -87,8 +96,7 @@ if __name__ == '__main__':
         import time
         time.sleep(10) 
     else:
-        app = Application.builder().token(TELEGRAM_TOKEN).build()
-        
+        app = Application.builder().token(TELEGRAM_TOKEN).build()        
         app.add_handler(CommandHandler("start", start_command))
         app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
         
