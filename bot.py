@@ -42,13 +42,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logging.info(f"User said: {user_text}")
 
     try:
+        # Send message to Groq AI with the UPDATED model name
         chat_completion = client.chat.completions.create(
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": user_text}
             ],
-            model="llama3-70b-8192", 
+            model="llama-3.1-70b-versatile", # ✅ FIXED: Updated to the new active model
         )
+
         ai_response = chat_completion.choices[0].message.content
         await update.message.reply_text(ai_response)
 
