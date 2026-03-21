@@ -57,8 +57,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info(f"User said: {user_text}")
 
     try:
-        # --- FINAL CORRECT MODEL NAME ---
-        # Based on Groq's official deprecation list, this is the active free model.
+        # --- CORRECT MODEL NAME ---
         model_name = "llama-3.1-8b-instant" 
         
         chat_completion = client.chat.completions.create(
@@ -96,8 +95,8 @@ if __name__ == '__main__':
         time.sleep(10) 
     else:
         app = Application.builder().token(TELEGRAM_TOKEN).build()
-                app.add_handler(CommandHandler("start", start_command))
-        app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+        
+        app.add_handler(CommandHandler("start", start_command))        app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
         
         logger.info("Bot is running and listening for messages...")
         app.run_polling(allowed_updates=Update.ALL_TYPES)
