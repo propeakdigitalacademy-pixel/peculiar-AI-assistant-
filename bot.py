@@ -96,7 +96,8 @@ if __name__ == '__main__':
     else:
         app = Application.builder().token(TELEGRAM_TOKEN).build()
         
-        app.add_handler(CommandHandler("start", start_command))        app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+        app.add_handler(CommandHandler("start", start_command))    
+        app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
         
         logger.info("Bot is running and listening for messages...")
         app.run_polling(allowed_updates=Update.ALL_TYPES)
