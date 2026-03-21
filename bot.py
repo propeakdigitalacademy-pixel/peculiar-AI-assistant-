@@ -57,9 +57,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info(f"User said: {user_text}")
 
     try:
-        # --- UPDATED MODEL NAME ---
-        # Using the classic, stable free-tier model
-        model_name = "llama3-70b-8192" 
+        # --- FINAL CORRECT MODEL NAME ---
+        # Based on Groq's official deprecation list, this is the active free model.
+        model_name = "llama-3.1-8b-instant" 
         
         chat_completion = client.chat.completions.create(
             messages=[
@@ -79,11 +79,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         error_msg = str(e)
         logger.error(f"Error processing message: {error_msg}")
         
-        # Specific check for model errors
         if "decommissioned" in error_msg or "invalid_request_error" in error_msg:
-            logger.error(f"MODEL ERROR: The model '{model_name}' is unavailable. Trying fallback...")
-            # Optional: You could add logic here to try a different model automatically
-            await update.message.reply_text("System Error: AI Model temporarily unavailable. Please try again in a minute.")
+            logger.error(f"MODEL ERROR: The model '{model_name}' is unavailable.")
+            await update.message.reply_text("System Error: AI Model configuration issue. Admin notified.")
         elif "authentication" in error_msg.lower():
             await update.message.reply_text("Authentication Error: Invalid API Key.")
         else:
@@ -96,9 +94,9 @@ if __name__ == '__main__':
         logger.error("Cannot start bot: Telegram Token is missing!")
         import time
         time.sleep(10) 
-    else:        app = Application.builder().token(TELEGRAM_TOKEN).build()
-        
-        app.add_handler(CommandHandler("start", start_command))
+    else:
+        app = Application.builder().token(TELEGRAM_TOKEN).build()
+                app.add_handler(CommandHandler("start", start_command))
         app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
         
         logger.info("Bot is running and listening for messages...")
